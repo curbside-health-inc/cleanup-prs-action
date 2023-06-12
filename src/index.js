@@ -5,6 +5,7 @@ const owner = core.getInput("owner");
 const repo = core.getInput("repo");
 const token = core.getInput("github-token");
 const inactiveDays = parseInt(core.getInput("days"), 10);
+const dryRun = core.getInput("dry-run") === "true";
 const prQuery = `
 query repository($name: String!, $owner: String!) {
   repository(name: $name, owner: $owner) {
@@ -97,35 +98,39 @@ gqlReq({
         return days > inactiveDays;
       })
       .forEach((pr) => {
-        // Add a comment
-        gqlReq({
-          query: addCommentQuery,
-          variables: {
-            input: {
-              subjectId: pr.id,
-              body: `This PR has been open for more than ${inactiveDays} days without any activity. Closing it.`,
-            },
-          },
-        })
-          .then((res) => {
-            core.debug("Close PR response", JSON.stringify(res));
-            core.info(`Added comment to PR #${pr.number}`);
-            return gqlReq({
-              query: closePrQuery,
-              variables: {
-                input: {
-                  pullRequestId: pr.id,
-                },
+        if (!dryRun) {
+          // Add a comment
+          gqlReq({
+            query: addCommentQuery,
+            variables: {
+              input: {
+                subjectId: pr.id,
+                body: `This PR has been open for more than ${inactiveDays} days without any activity. Closing it.`,
               },
+            },
+          })
+            .then((res) => {
+              core.debug(`Close PR response ${JSON.stringify(res)}`);
+              core.info(`Added comment to PR #${pr.number}`);
+              return gqlReq({
+                query: closePrQuery,
+                variables: {
+                  input: {
+                    pullRequestId: pr.id,
+                  },
+                },
+              });
+            })
+            .then((res) => {
+              core.debug(JSON.stringify(res));
+              core.info(`Closed PR #${pr.id}`);
+            })
+            .catch((err) => {
+              core.setFailed(err.message || err);
             });
-          })
-          .then((res) => {
-            core.debug(JSON.stringify(res));
-            core.info(`Closed PR #${pr.id}`);
-          })
-          .catch((err) => {
-            core.setFailed(err.message || err);
-          });
+        } else {
+          core.info(`Would have closed PR #${pr.number}`);
+        }
       });
   })
   .catch((err) => {
