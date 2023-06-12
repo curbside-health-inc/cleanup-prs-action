@@ -2846,6 +2846,7 @@ const core = __nccwpck_require__(186);
 const owner = core.getInput('owner')
 const repo = core.getInput('repo')
 const token = core.getInput('token')
+const inactiveDays = parseInt(core.getInput('days'), 10)
 const prQuery = `
 query repository($name: String!, $owner: String!) {
   repository(name: $name, owner: $owner) {
@@ -2930,13 +2931,13 @@ gqlReq({query: prQuery, variables : {
     const now = new Date()
     const diff = now - updatedAt
     const days = diff / (1000 * 60 * 60 * 24)
-    return days > 5
+    return days > inactiveDays
     }).forEach((pr) => {
       // Add a comment
       gqlReq({query: addCommentQuery, variables: {
         input: {
           subjectId: pr.id,
-          body: "This PR has been open for more than 5 days without any activity. Closing it."
+          body: `This PR has been open for more than ${inactiveDays} days without any activity. Closing it.`
         }
       }})
       .then((res) => {
