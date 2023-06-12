@@ -80,27 +80,31 @@ const gqlReq = ({ query, variables }) =>
     req.on("error", reject);
     req.end();
   });
-gqlReq({
-  query: prQuery,
-  variables: {
-    owner,
-    name: repo,
-  },
-})
-  .then((prs) => {
-    core.debug(`PRs ${JSON.stringify(prs)}`);
-    prs.data.repository.pullRequests.nodes
-      .filter((pr) => {
-        const updatedAt = new Date(pr.updatedAt);
-        const now = new Date();
-        const diff = now - updatedAt;
-        const days = diff / (1000 * 60 * 60 * 24);
-        return days > inactiveDays;
-      })
-      .forEach((pr) => {
-        if (!dryRun) {
+
+async function run() {
+  try {
+    const prs = await gqlReq({
+      query: prQuery,
+      variables: {
+        owner,
+        name: repo,
+      },
+    });
+    const filteredPrs = prs.data.repository.pullRequests.nodes.filter((pr) => {
+      const updatedAt = new Date(pr.updatedAt);
+      const now = new Date();
+      const diff = now - updatedAt;
+      const days = diff / (1000 * 60 * 60 * 24);
+      return days > inactiveDays;
+    });
+    core.info(
+      `Found ${filteredPrs.length} PRs inactive for more than ${inactiveDays} days`
+    );
+    if (!dryRun) {
+      await Promise.all(
+        filteredPrs.map(async (pr) => {
           // Add a comment
-          gqlReq({
+          const addCommentRes = await gqlReq({
             query: addCommentQuery,
             variables: {
               input: {
@@ -108,31 +112,31 @@ gqlReq({
                 body: `This PR has been open for more than ${inactiveDays} days without any activity. Closing it.`,
               },
             },
-          })
-            .then((res) => {
-              core.debug(`Close PR response ${JSON.stringify(res)}`);
-              core.info(`Added comment to PR #${pr.number}`);
-              return gqlReq({
-                query: closePrQuery,
-                variables: {
-                  input: {
-                    pullRequestId: pr.id,
-                  },
-                },
-              });
-            })
-            .then((res) => {
-              core.debug(JSON.stringify(res));
-              core.info(`Closed PR #${pr.id}`);
-            })
-            .catch((err) => {
-              core.setFailed(err.message || err);
-            });
-        } else {
-          core.info(`Would have closed PR #${pr.number}`);
-        }
-      });
-  })
-  .catch((err) => {
+          });
+          core.debug(`Close PR response ${JSON.stringify(addCommentRes)}`);
+          core.info(`Added comment to PR #${pr.number}`);
+          const closeRes = await gqlReq({
+            query: closePrQuery,
+            variables: {
+              input: {
+                pullRequestId: pr.id,
+              },
+            },
+          });
+          core.debug(JSON.stringify(closeRes));
+          core.info(`Closed PR #${pr.id}`);
+        })
+      );
+    } else {
+      core.info(
+        `Would have closed PR(s) #${filteredPrs
+          .map((pr) => pr.number)
+          .join(", #")}`
+      );
+    }
+  } catch (err) {
     core.setFailed(err.message || err);
-  });
+  }
+}
+
+run();
