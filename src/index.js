@@ -63,7 +63,9 @@ const gqlReq = ({query, variables}) => new Promise((resolve, reject) => {
       core.debug(`Response: ${data}`)
       core.debug(`Status ${res.statusCode}`)
       const json = JSON.parse(data)
-      if (json.errors) {
+      if (res.statusCode !== 200) {
+        reject(json)
+      } else if (json.errors) {
         reject(json.errors)
       } else {
         resolve(json)
