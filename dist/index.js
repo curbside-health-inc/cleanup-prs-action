@@ -2901,7 +2901,14 @@ const gqlReq = ({query, variables}) => new Promise((resolve, reject) => {
     res.setEncoding('utf8');
     let data = '';
     res.on('data', (d) => data += d);
-    res.on('end', () => resolve(JSON.parse(data)));
+    res.on('end', () => {
+      const json = JSON.parse(data)
+      if (json.errors) {
+        reject(json.errors)
+      } else {
+        resolve(json)
+      }
+    });
   })
   
   req.write(JSON.stringify({ query, variables }))
@@ -2941,11 +2948,11 @@ gqlReq({query: prQuery, variables : {
         core.info(`Closed PR #${pr.id}`)
       })
       .catch((err) => {
-        core.setFailed(err.message);
+        core.setFailed(err.message || err);
       })
     })
 }).catch((err) => {
-  core.setFailed(err.message);
+  core.setFailed(err.message || err);
 })
 
 })();
