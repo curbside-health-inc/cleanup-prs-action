@@ -2843,10 +2843,10 @@ var __webpack_exports__ = {};
 const https = __nccwpck_require__(286);
 const core = __nccwpck_require__(186);
 
-const owner = core.getInput('owner')
-const repo = core.getInput('repo')
-const token = core.getInput('github-token')
-const inactiveDays = parseInt(core.getInput('days'), 10)
+const owner = core.getInput("owner");
+const repo = core.getInput("repo");
+const token = core.getInput("github-token");
+const inactiveDays = parseInt(core.getInput("days"), 10);
 const prQuery = `
 query repository($name: String!, $owner: String!) {
   repository(name: $name, owner: $owner) {
@@ -2859,7 +2859,7 @@ query repository($name: String!, $owner: String!) {
     }
   }
 }
-`
+`;
 
 const closePrQuery = `
 mutation closePr($input: ClosePullRequestInput!) {
@@ -2869,8 +2869,7 @@ mutation closePr($input: ClosePullRequestInput!) {
     }
   }
 }
-`
-
+`;
 
 const addCommentQuery = `
 mutation addComment($input: AddCommentInput!) {
@@ -2882,84 +2881,98 @@ mutation addComment($input: AddCommentInput!) {
     }
   }
 }
-`
+`;
 
 const options = {
-  hostname: 'api.github.com',
+  hostname: "api.github.com",
   port: 443,
-  path: '/graphql',
-  method: 'POST',
+  path: "/graphql",
+  method: "POST",
   headers: {
-    'Content-Type': 'application/json',
-    "Authorization": `Bearer ${token}`,
-    "Accept": "application/vnd.github.v4.idl",
-    "User-Agent": "Github Actions"
-  }
-}
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github.v4.idl",
+    "User-Agent": "Github Actions",
+  },
+};
 
-const gqlReq = ({query, variables}) => new Promise((resolve, reject) => {
-  const req = https.request(options, (res) => {
-    res.setEncoding('utf8');
-    let data = '';
-    res.on('data', (d) => data += d);
-    res.on('end', () => {
-      core.debug(`Response: ${data}`)
-      core.debug(`Status ${res.statusCode}`)
-      const json = JSON.parse(data)
-      if (res.statusCode !== 200) {
-        reject(json)
-      } else if (json.errors) {
-        reject(json.errors)
-      } else {
-        resolve(json)
-      }
-    });
-  })
-  
-  req.write(JSON.stringify({ query, variables }))
-  
-  req.on('error', reject);
-  req.end();
-})
-gqlReq({query: prQuery, variables : {
-  owner,
-  name: repo,
-}}).then((prs) => {
-  core.debug(`PRs ${JSON.stringify(prs)}`)
-  prs.data.repository.pullRequests.nodes.filter((pr) => {
-    const updatedAt = new Date(pr.updatedAt)
-    const now = new Date()
-    const diff = now - updatedAt
-    const days = diff / (1000 * 60 * 60 * 24)
-    return days > inactiveDays
-    }).forEach((pr) => {
-      // Add a comment
-      gqlReq({query: addCommentQuery, variables: {
-        input: {
-          subjectId: pr.id,
-          body: `This PR has been open for more than ${inactiveDays} days without any activity. Closing it.`
+const gqlReq = ({ query, variables }) =>
+  new Promise((resolve, reject) => {
+    const req = https.request(options, (res) => {
+      res.setEncoding("utf8");
+      let data = "";
+      res.on("data", (d) => (data += d));
+      res.on("end", () => {
+        core.debug(`Response: ${data}`);
+        core.debug(`Status ${res.statusCode}`);
+        const json = JSON.parse(data);
+        if (res.statusCode !== 200) {
+          reject(json);
+        } else if (json.errors) {
+          reject(json.errors);
+        } else {
+          resolve(json);
         }
-      }})
-      .then((res) => {
-        core.debug('Close PR response', JSON.stringify(res))
-        core.info(`Added comment to PR #${pr.number}`)
-        return gqlReq({query: closePrQuery, variables: {
-          input: {
-            pullRequestId: pr.id
-          }
-        }})
-      })
-      .then((res) => {
-        core.debug(JSON.stringify(res))
-        core.info(`Closed PR #${pr.id}`)
-      })
-      .catch((err) => {
-        core.setFailed(err.message || err);
-      })
-    })
-}).catch((err) => {
-  core.setFailed(err.message || err);
+      });
+    });
+
+    req.write(JSON.stringify({ query, variables }));
+
+    req.on("error", reject);
+    req.end();
+  });
+gqlReq({
+  query: prQuery,
+  variables: {
+    owner,
+    name: repo,
+  },
 })
+  .then((prs) => {
+    core.debug(`PRs ${JSON.stringify(prs)}`);
+    prs.data.repository.pullRequests.nodes
+      .filter((pr) => {
+        const updatedAt = new Date(pr.updatedAt);
+        const now = new Date();
+        const diff = now - updatedAt;
+        const days = diff / (1000 * 60 * 60 * 24);
+        return days > inactiveDays;
+      })
+      .forEach((pr) => {
+        // Add a comment
+        gqlReq({
+          query: addCommentQuery,
+          variables: {
+            input: {
+              subjectId: pr.id,
+              body: `This PR has been open for more than ${inactiveDays} days without any activity. Closing it.`,
+            },
+          },
+        })
+          .then((res) => {
+            core.debug("Close PR response", JSON.stringify(res));
+            core.info(`Added comment to PR #${pr.number}`);
+            return gqlReq({
+              query: closePrQuery,
+              variables: {
+                input: {
+                  pullRequestId: pr.id,
+                },
+              },
+            });
+          })
+          .then((res) => {
+            core.debug(JSON.stringify(res));
+            core.info(`Closed PR #${pr.id}`);
+          })
+          .catch((err) => {
+            core.setFailed(err.message || err);
+          });
+      });
+  })
+  .catch((err) => {
+    core.setFailed(err.message || err);
+  });
 
 })();
 
