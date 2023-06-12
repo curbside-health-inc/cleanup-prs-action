@@ -3,7 +3,13 @@ description: Cleanup PRs that have been not updated
 inputs:
   github-token:  # id of input
     description: GitHub Token
-    required: false
+    required: true
+  owner:
+    description: Owner of the repo
+    required: true
+  repo:
+    description: Repo name
+    required: true
 runs:
   using: node16
   main: dist/index.js

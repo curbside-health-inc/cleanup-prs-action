@@ -1,9 +1,9 @@
 const https = require('node:https');
 const core = require('@actions/core');
-const github = require('@actions/github');
 
 const owner = core.getInput('owner')
 const repo = core.getInput('repo')
+const token = core.getInput('token')
 const prQuery = `
 query repository($name: String!, $owner: String!) {
   repository(name: $name, owner: $owner) {
@@ -48,7 +48,7 @@ const options = {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
-    "Authorization": "Bearer ${{ secrets.GITHUB_TOKEN }}",
+    "Authorization": `Bearer ${token}`,
     "Accept": "application/vnd.github.v4.idl",
     "User-Agent": "Github Actions"
   }
@@ -68,7 +68,6 @@ const gqlReq = ({query, variables}) => new Promise((resolve, reject) => {
   req.end();
 })
 const payload = JSON.stringify(github.context.payload, undefined, 2)
-console.log(`The event payload: ${payload}`);
 gqlReq({query: prQuery, variables : {
   owner,
   name: repo,
@@ -88,8 +87,8 @@ gqlReq({query: prQuery, variables : {
         }
       }})
       .then((res) => {
-        console.log('Close PR response', res)
-        console.log(`Added comment to PR #${pr.number}`)
+        core.debug('Close PR response', res)
+        core.info(`Added comment to PR #${pr.number}`)
         return gqlReq({query: closePrQuery, variables: {
           input: {
             pullRequestId: pr.id
@@ -97,8 +96,8 @@ gqlReq({query: prQuery, variables : {
         }})
       })
       .then((res) => {
-        console.log(res)
-        console.log(`Closed PR #${pr.id}`)
+        core.debug(res)
+        core.info(`Closed PR #${pr.id}`)
       })
       .catch((err) => {
         core.setFailed(err.message);
