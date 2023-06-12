@@ -2920,6 +2920,7 @@ gqlReq({query: prQuery, variables : {
   owner,
   name: repo,
 }}).then((prs) => {
+  core.debug('PRs', prs)
   prs.data.repository.pullRequests.nodes.filter((pr) => {
     const updatedAt = new Date(pr.updatedAt)
     const now = new Date()
