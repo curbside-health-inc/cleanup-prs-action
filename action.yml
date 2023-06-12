@@ -3,7 +3,21 @@ description: Cleanup PRs that have been not updated
 inputs:
   github-token:  # id of input
     description: GitHub Token
+    required: true
+  owner:
+    description: Owner of the repo
+    required: true
+  repo:
+    description: Repo name
+    required: true
+  inactive-days:
+    description: Number of days to consider a PR inactive
+    required: true
+    default: "5"
+  dry-run:
+    description: If true, will not delete PRs
     required: false
+    default: "false"
 runs:
   using: node16
   main: dist/index.js
