@@ -60,6 +60,8 @@ const gqlReq = ({query, variables}) => new Promise((resolve, reject) => {
     let data = '';
     res.on('data', (d) => data += d);
     res.on('end', () => {
+      core.debug('Response', data)
+      core.debug('Status', res.statusCode)
       const json = JSON.parse(data)
       if (json.errors) {
         reject(json.errors)
