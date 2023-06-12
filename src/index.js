@@ -78,7 +78,7 @@ gqlReq({query: prQuery, variables : {
   owner,
   name: repo,
 }}).then((prs) => {
-  core.debug('PRs', prs)
+  core.debug('PRs', JSON.stringify(prs))
   prs.data.repository.pullRequests.nodes.filter((pr) => {
     const updatedAt = new Date(pr.updatedAt)
     const now = new Date()
@@ -94,7 +94,7 @@ gqlReq({query: prQuery, variables : {
         }
       }})
       .then((res) => {
-        core.debug('Close PR response', res)
+        core.debug('Close PR response', JSON.stringify(res))
         core.info(`Added comment to PR #${pr.number}`)
         return gqlReq({query: closePrQuery, variables: {
           input: {
@@ -103,7 +103,7 @@ gqlReq({query: prQuery, variables : {
         }})
       })
       .then((res) => {
-        core.debug(res)
+        core.debug(JSON.stringify(res))
         core.info(`Closed PR #${pr.id}`)
       })
       .catch((err) => {
