@@ -60,8 +60,8 @@ const gqlReq = ({query, variables}) => new Promise((resolve, reject) => {
     let data = '';
     res.on('data', (d) => data += d);
     res.on('end', () => {
-      core.debug('Response', data)
-      core.debug('Status', res.statusCode)
+      core.debug(`Response: ${data}`)
+      core.debug(`Status ${res.statusCode}`)
       const json = JSON.parse(data)
       if (json.errors) {
         reject(json.errors)
@@ -80,7 +80,7 @@ gqlReq({query: prQuery, variables : {
   owner,
   name: repo,
 }}).then((prs) => {
-  core.debug('PRs', JSON.stringify(prs))
+  core.debug(`PRs ${JSON.stringify(prs)}`)
   prs.data.repository.pullRequests.nodes.filter((pr) => {
     const updatedAt = new Date(pr.updatedAt)
     const now = new Date()
