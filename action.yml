@@ -3,7 +3,7 @@ description: Cleanup PRs that have been not updated
 inputs:
   github-token:  # id of input
     description: GitHub Token
-    required: true
+    required: false
 runs:
   using: node16
   main: dist/index.js
