@@ -67,7 +67,6 @@ const gqlReq = ({query, variables}) => new Promise((resolve, reject) => {
   req.on('error', reject);
   req.end();
 })
-const payload = JSON.stringify(github.context.payload, undefined, 2)
 gqlReq({query: prQuery, variables : {
   owner,
   name: repo,
