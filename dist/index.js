@@ -2845,7 +2845,7 @@ const core = __nccwpck_require__(186);
 
 const owner = core.getInput('owner')
 const repo = core.getInput('repo')
-const token = core.getInput('token')
+const token = core.getInput('github-token')
 const inactiveDays = parseInt(core.getInput('days'), 10)
 const prQuery = `
 query repository($name: String!, $owner: String!) {
