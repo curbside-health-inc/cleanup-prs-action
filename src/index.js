@@ -132,7 +132,9 @@ async function run() {
           core.info(`Closed PR #${pr.id}`);
         })
       );
-      core.exportVariable("CLOSED_PR_APP_NAME", closedPrsAppName(filteredPrs));
+      if (core.getInput('app-name-template')) {
+        core.exportVariable("CLOSED_PR_APP_NAME", closedPrsAppName(filteredPrs));
+      }
     } else {
       core.info(
         `Would have closed PR(s) #${filteredPrs
