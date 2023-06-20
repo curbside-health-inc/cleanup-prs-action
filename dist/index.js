@@ -2897,10 +2897,10 @@ const options = {
   },
 };
 
-const template = (string, variables) =>
+const template = (string) => (variables) =>
   string.replace(/\${(.*?)}/g, (_, v) => variables[v]);
 
-const closedPrsAppName = (prs) => prs.map((pr) => template(core.getInput('app-name-template'), {number: pr.number})).join(" ");
+const closedPrsAppName = (prs) => prs.map(template(core.getInput('app-name-template'))).join(" ");
 
 const gqlReq = ({ query, variables }) =>
   new Promise((resolve, reject) => {
@@ -2974,14 +2974,17 @@ async function run() {
           core.info(`Closed PR #${pr.id}`);
         })
       );
-      core.exportVariable("CLOSED_PR_APP_NAME", closedPrsAppName(filteredPrs));
+      if (core.getInput('app-name-template')) {
+        core.exportVariable("APP_NAME", closedPrsAppName(filteredPrs));
+      }
     } else {
-      core.info(
-        `Would have closed PR(s) #${filteredPrs
-          .map((pr) => pr.number)
-          .join(", #")}`
-      );
-      core.exportVariable("CLOSED_PR_APP_NAME", closedPrsAppName(filteredPrs));
+      // core.info(
+      //   `Would have closed PR(s) #${filteredPrs
+      //     .map((pr) => pr.number)
+      //     .join(", #")}`
+      // );
+      core.info(`App Names ${closedPrsAppName([{number: 1}])}`);
+      core.exportVariable("APP_NAME", closedPrsAppName([{number: 1}]));
     }
   } catch (err) {
     core.setFailed(err.message || err);
