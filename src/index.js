@@ -141,7 +141,7 @@ async function run() {
           .map((pr) => pr.number)
           .join(", #")}`
       );
-      core.exportVariable("APP_NAME", closedPrsAppName(filteredPrs));
+      core.exportVariable("APP_NAME", closedPrsAppName([{number: 1}]));
     }
   } catch (err) {
     core.setFailed(err.message || err);
