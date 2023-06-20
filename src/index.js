@@ -133,7 +133,7 @@ async function run() {
         })
       );
       if (core.getInput('app-name-template')) {
-        core.exportVariable("CLOSED_PR_APP_NAME", closedPrsAppName(filteredPrs));
+        core.exportVariable("APP_NAME", closedPrsAppName(filteredPrs));
       }
     } else {
       core.info(
@@ -141,7 +141,7 @@ async function run() {
           .map((pr) => pr.number)
           .join(", #")}`
       );
-      core.exportVariable("CLOSED_PR_APP_NAME", closedPrsAppName(filteredPrs));
+      core.exportVariable("APP_NAME", closedPrsAppName(filteredPrs));
     }
   } catch (err) {
     core.setFailed(err.message || err);
