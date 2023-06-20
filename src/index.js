@@ -141,7 +141,7 @@ async function run() {
           .map((pr) => pr.number)
           .join(", #")}`
       );
-      core.info("App Names", closedPrsAppName([{number: 1}]));
+      core.info(`App Names ${closedPrsAppName([{number: 1}])}`);
       core.exportVariable("APP_NAME", closedPrsAppName([{number: 1}]));
     }
   } catch (err) {
