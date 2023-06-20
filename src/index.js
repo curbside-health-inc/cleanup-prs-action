@@ -136,13 +136,13 @@ async function run() {
         core.exportVariable("APP_NAME", closedPrsAppName(filteredPrs));
       }
     } else {
-      // core.info(
-      //   `Would have closed PR(s) #${filteredPrs
-      //     .map((pr) => pr.number)
-      //     .join(", #")}`
-      // );
-      core.info(`App Names ${closedPrsAppName([{number: 1}])}`);
-      core.exportVariable("APP_NAME", closedPrsAppName([{number: 1}]));
+      core.info(
+        `Would have closed PR(s) #${filteredPrs
+          .map((pr) => pr.number)
+          .join(", #")}`
+      );
+      core.info(`App Names ${closedPrsAppName(filteredPrs)}`);
+      core.exportVariable("APP_NAME", closedPrsAppName(filteredPrs));
     }
   } catch (err) {
     core.setFailed(err.message || err);
