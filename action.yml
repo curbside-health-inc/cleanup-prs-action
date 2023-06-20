@@ -18,6 +18,9 @@ inputs:
     description: If true, will not delete PRs
     required: false
     default: "false"
+  app-name-template:
+    description: Template for the app name
+    required: false
 runs:
   using: node16
   main: dist/index.js

@@ -55,6 +55,11 @@ const options = {
   },
 };
 
+const template = (string, variables) =>
+  string.replace(/\${(.*?)}/g, (_, v) => variables[v]);
+
+const closedPrsAppName = (prs) => prs.map((pr) => template(core.getInput('app-name-template'), {number: pr.number})).join(" ");
+
 const gqlReq = ({ query, variables }) =>
   new Promise((resolve, reject) => {
     const req = https.request(options, (res) => {
@@ -127,12 +132,14 @@ async function run() {
           core.info(`Closed PR #${pr.id}`);
         })
       );
+      core.exportVariable("CLOSED_PR_APP_NAME", closedPrsAppName(filteredPrs));
     } else {
       core.info(
         `Would have closed PR(s) #${filteredPrs
           .map((pr) => pr.number)
           .join(", #")}`
       );
+      core.exportVariable("CLOSED_PR_APP_NAME", closedPrsAppName(filteredPrs));
     }
   } catch (err) {
     core.setFailed(err.message || err);
