@@ -21,6 +21,12 @@ inputs:
   app-name-template:
     description: Template for the app name
     required: false
+  cecm-app-name-template:
+    description: Template for the cecm app name
+    required: false
+  caw-app-name-template:
+    description: Template for the caw app name
+    required: false
 runs:
   using: node16
   main: dist/index.js

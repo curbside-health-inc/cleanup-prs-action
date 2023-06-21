@@ -58,7 +58,15 @@ const options = {
 const template = (string) => (variables) =>
   string.replace(/\${(.*?)}/g, (_, v) => variables[v]);
 
-const closedPrsAppName = (prs) => prs.map(template(core.getInput('app-name-template'))).join(" ");
+const cecmRegex = new RegExp(/\[x\] cecm-frontend/g);
+const cawRegex = new RegExp(/\[x\] caw-frontend/g);
+
+const appNameTemplate = core.getInput("app-name-template");
+const cecmAppNameTemplate = core.getInput("cecm-app-name-template");
+const cawAppNameTemplate = core.getInput("caw-app-name-template");
+
+const closedPrsAppList = (prs) => prs.map(template(appNameTemplate));
+const closedPrsAppName = (prs) => closedPrsAppList(prs).join(" ");
 
 const gqlReq = ({ query, variables }) =>
   new Promise((resolve, reject) => {
@@ -132,8 +140,16 @@ async function run() {
           core.info(`Closed PR #${pr.id}`);
         })
       );
-      if (core.getInput('app-name-template')) {
-        core.exportVariable("APP_NAME", closedPrsAppName(filteredPrs));
+      if (appNameTemplate) {
+        const list = closedPrsAppList(prs);
+        filteredPrs.forEach((pr) => {
+          if (cecmRegex.test(pr.description)) {
+            list.push(template(cecmAppNameTemplate)(pr.id))
+          } else if (cawRegex.test(pr.description)) {
+            list.push(template(cawAppNameTemplate)(pr.id))
+          }
+        })
+        core.exportVariable("APP_NAME", list.join(' '));
       }
     } else {
       core.info(
