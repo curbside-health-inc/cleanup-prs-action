@@ -2986,12 +2986,12 @@ async function run() {
         const list = closedPrsAppList(filteredPrs);
         filteredPrs.forEach((pr) => {
           if (cecmRegex.test(pr.description)) {
-            list.push(template(cecmAppNameTemplate)(pr.id))
+            list.push(template(cecmAppNameTemplate)(pr.id));
           } else if (cawRegex.test(pr.description)) {
-            list.push(template(cawAppNameTemplate)(pr.id))
+            list.push(template(cawAppNameTemplate)(pr.id));
           }
-        })
-        core.exportVariable("APP_NAME", list.join(' '));
+        });
+        core.exportVariable("APP_NAME", list.join(" "));
       }
     } else {
       core.info(
