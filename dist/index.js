@@ -2983,7 +2983,7 @@ async function run() {
         })
       );
       if (appNameTemplate) {
-        const list = closedPrsAppList(prs);
+        const list = closedPrsAppList(filteredPrs);
         filteredPrs.forEach((pr) => {
           if (cecmRegex.test(pr.description)) {
             list.push(template(cecmAppNameTemplate)(pr.id))
