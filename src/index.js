@@ -6,14 +6,23 @@ const repo = core.getInput("repo");
 const token = core.getInput("github-token");
 const inactiveDays = parseInt(core.getInput("inactive-days"), 10);
 const dryRun = core.getInput("dry-run") === "true";
+
+// `body` is required: the cecm/caw checkbox detection below reads it. It used to
+// be missing from the selection set, so `pr.body` was always undefined and the
+// companion-app cleanup could never fire.
 const prQuery = `
-query repository($name: String!, $owner: String!) {
+query repository($name: String!, $owner: String!, $after: String) {
   repository(name: $name, owner: $owner) {
-    pullRequests(first: 10, states: [OPEN], orderBy: {field: UPDATED_AT, direction: ASC}) {
+    pullRequests(first: 100, after: $after, states: [OPEN], orderBy: {field: UPDATED_AT, direction: ASC}) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
       nodes {
         id
         number
         updatedAt
+        body
       }
     }
   }
@@ -58,15 +67,34 @@ const options = {
 const template = (string) => (variables) =>
   string.replace(/\${(.*?)}/g, (_, v) => variables[v]);
 
-const cecmRegex = new RegExp(/\[x\] cecm-frontend/g);
-const cawRegex = new RegExp(/\[x\] caw-frontend/g);
+// NOTE: no `g` flag. `RegExp.prototype.test` on a global regex is stateful — it
+// advances `lastIndex` between calls, so reusing one across PRs alternates
+// true/false and silently skips every other match.
+const cecmRegex = /\[x\]\s*cecm-frontend/i;
+const cawRegex = /\[x\]\s*caw-frontend/i;
 
 const appNameTemplate = core.getInput("app-name-template");
 const cecmAppNameTemplate = core.getInput("cecm-app-name-template");
 const cawAppNameTemplate = core.getInput("caw-app-name-template");
 
-const closedPrsAppList = (prs) => prs.map(template(appNameTemplate));
-const closedPrsAppName = (prs) => closedPrsAppList(prs).join(" ");
+// The app names to hand to the caller's `helm uninstall` step: one per closed
+// PR, plus a companion frontend app for each PR that opted into one.
+const closedPrsAppList = (prs) => {
+  if (!appNameTemplate) return [];
+  const list = prs.map((pr) => template(appNameTemplate)(pr));
+  prs.forEach((pr) => {
+    const body = pr.body || "";
+    // Independent `if`s, not `if/else if`: a PR can tick both boxes, and the
+    // chained version dropped the caw app whenever cecm also matched.
+    if (cecmAppNameTemplate && cecmRegex.test(body)) {
+      list.push(template(cecmAppNameTemplate)(pr));
+    }
+    if (cawAppNameTemplate && cawRegex.test(body)) {
+      list.push(template(cawAppNameTemplate)(pr));
+    }
+  });
+  return list;
+};
 
 const gqlReq = ({ query, variables }) =>
   new Promise((resolve, reject) => {
@@ -77,7 +105,20 @@ const gqlReq = ({ query, variables }) =>
       res.on("end", () => {
         core.debug(`Response: ${data}`);
         core.debug(`Status ${res.statusCode}`);
-        const json = JSON.parse(data);
+        let json;
+        try {
+          json = JSON.parse(data);
+        } catch (e) {
+          reject(
+            new Error(
+              `Non-JSON response (HTTP ${res.statusCode}): ${data.slice(
+                0,
+                200
+              )}`
+            )
+          );
+          return;
+        }
         if (res.statusCode !== 200) {
           reject(json);
         } else if (json.errors) {
@@ -94,74 +135,75 @@ const gqlReq = ({ query, variables }) =>
     req.end();
   });
 
+// Walk every page. The old query took `first: 10` with no pagination, capping
+// each run at 10 closures regardless of how large the backlog was.
+const fetchOpenPrs = async () => {
+  const prs = [];
+  let after = null;
+  for (;;) {
+    const res = await gqlReq({
+      query: prQuery,
+      variables: { owner, name: repo, after },
+    });
+    const page = res.data.repository.pullRequests;
+    prs.push(...page.nodes);
+    if (!page.pageInfo.hasNextPage) break;
+    after = page.pageInfo.endCursor;
+  }
+  return prs;
+};
+
 async function run() {
   try {
-    const prs = await gqlReq({
-      query: prQuery,
-      variables: {
-        owner,
-        name: repo,
-      },
-    });
-    const filteredPrs = prs.data.repository.pullRequests.nodes.filter((pr) => {
-      const updatedAt = new Date(pr.updatedAt);
-      const now = new Date();
-      const diff = now - updatedAt;
-      const days = diff / (1000 * 60 * 60 * 24);
+    const prs = await fetchOpenPrs();
+    core.info(`Fetched ${prs.length} open PR(s)`);
+
+    const now = new Date();
+    const filteredPrs = prs.filter((pr) => {
+      const days = (now - new Date(pr.updatedAt)) / (1000 * 60 * 60 * 24);
       return days > inactiveDays;
     });
     core.info(
       `Found ${filteredPrs.length} PRs inactive for more than ${inactiveDays} days`
     );
-    if (!dryRun) {
-      await Promise.all(
-        filteredPrs.map(async (pr) => {
-          // Add a comment
-          const addCommentRes = await gqlReq({
-            query: addCommentQuery,
-            variables: {
-              input: {
-                subjectId: pr.id,
-                body: `This PR has been open for more than ${inactiveDays} days without any activity. Closing it.`,
-              },
-            },
-          });
-          core.debug(`Close PR response ${JSON.stringify(addCommentRes)}`);
-          core.info(`Added comment to PR #${pr.number}`);
-          const closeRes = await gqlReq({
-            query: closePrQuery,
-            variables: {
-              input: {
-                pullRequestId: pr.id,
-              },
-            },
-          });
-          core.debug(JSON.stringify(closeRes));
-          core.info(`Closed PR #${pr.id}`);
-        })
-      );
-      if (appNameTemplate) {
-        const list = closedPrsAppList(filteredPrs);
-        filteredPrs.forEach((pr) => {
-          if (cecmRegex.test(pr.description)) {
-            list.push(template(cecmAppNameTemplate)(pr.id));
-          } else if (cawRegex.test(pr.description)) {
-            list.push(template(cawAppNameTemplate)(pr.id));
-          }
-        });
-        core.exportVariable("APP_NAME", list.join(" "));
-      }
-    } else {
+
+    // Built the same way on both paths — dry-run used to report a different
+    // (companion-app-free) list than the one a real run would act on.
+    const appNames = closedPrsAppList(filteredPrs);
+
+    if (dryRun) {
       core.info(
-        `Would have closed PR(s) #${filteredPrs
-          .map((pr) => pr.number)
-          .join(", #")}`
+        `Would have closed PR(s) ${filteredPrs
+          .map((pr) => `#${pr.number}`)
+          .join(", ")}`
       );
-      core.info(`App Names ${closedPrsAppName(filteredPrs)}`);
-      core.exportVariable("APP_NAME", closedPrsAppName(filteredPrs));
+    } else {
+      // Sequential, not Promise.all: bursting mutations trips GitHub's
+      // secondary rate limits, and now that pagination is fixed a backlog could
+      // be far larger than the previous hard cap of 10.
+      for (const pr of filteredPrs) {
+        await gqlReq({
+          query: addCommentQuery,
+          variables: {
+            input: {
+              subjectId: pr.id,
+              body: `This PR has been open for more than ${inactiveDays} days without any activity. Closing it.`,
+            },
+          },
+        });
+        core.info(`Added comment to PR #${pr.number}`);
+        await gqlReq({
+          query: closePrQuery,
+          variables: { input: { pullRequestId: pr.id } },
+        });
+        core.info(`Closed PR #${pr.number}`);
+      }
     }
+
+    core.info(`App Names ${appNames.join(" ")}`);
+    core.exportVariable("APP_NAME", appNames.join(" "));
   } catch (err) {
-    core.setFailed(err.message || err);
+    core.setFailed(err.message || JSON.stringify(err));
   }
 }
 
